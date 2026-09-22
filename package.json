@@ -2,12 +2,12 @@
   "name": "campus-bites",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
+"scripts": {
   "start": "node backend/server.js",
-  "server": "nodemon backend/server.js",
+  "server": "npx nodemon backend/server.js",
   "client": "npm run dev --prefix frontend",
   "dev": "concurrently \"npm run server\" \"npm run client\""
-  },
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
