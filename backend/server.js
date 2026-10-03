@@ -1,22 +1,37 @@
+// backend/server.js
 require('dotenv').config();
 const express = require('express');
 const connectDB = require('./src/config/db');
+const authRoutes = require('./src/routes/authRoutes');
+const restaurantRoutes = require('./src/routes/restaurantRoutes');
+
 
 const app = express();
 
-// Middleware to parse JSON requests
+// 1. TRACKER: This will immediately log the moment a request touches your server
+app.use((req, res, next) => {
+    console.log(`\n--> [INCOMING] ${req.method} request to ${req.url}`);
+    next();
+});
+
+// 2. JSON PARSER: (Ensure the parentheses are here!)
 app.use(express.json());
 
-// Connect to the Docker MongoDB instance
-connectDB();
-
-// Basic test route
+// 3. BASE ROUTE
 app.get('/', (req, res) => {
+    console.log("--> Successfully reached the '/' route. Sending response...");
     res.send('Campus Bites API is running...');
 });
 
-const PORT = process.env.PORT || 5000;
+// 4. API ROUTES
+app.use('/api/auth', authRoutes);
+app.use('/api/restaurants', restaurantRoutes);
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+const PORT = process.env.PORT || 8000;
+
+connectDB().then(() => {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
 });
+
