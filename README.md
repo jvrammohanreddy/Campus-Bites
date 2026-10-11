@@ -30,3 +30,14 @@ campus-bites/
         ├── services/          # API abstractions (Axios calls)
         ├── App.jsx            
         └── main.jsx
+
+
+node server.js
+
+//remove docker
+docker rm campus-bites-db
+docker volume rm campus_bites_data
+
+Run docker
+docker run --name campus-bites-db -d -p 27017:27017 -v campus_bites_data:/data/db -e GLIBC_TUNABLES=glibc.pthread.rseq=0 mongo:7.0
+docker start campus-bites-db
