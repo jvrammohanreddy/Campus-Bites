@@ -1,10 +1,12 @@
-// backend/server.js
 require('dotenv').config();
 const express = require('express');
 const connectDB = require('./src/config/db');
 const authRoutes = require('./src/routes/authRoutes');
+const userRoutes = require('./src/routes/userRoutes'); 
 const restaurantRoutes = require('./src/routes/restaurantRoutes');
-
+const vendorRoutes = require('./src/routes/vendorRoutes');
+const orderRoutes = require('./src/routes/orderRoutes');
+const deliveryRoutes = require('./src/routes/deliveryRoutes');
 
 const app = express();
 
@@ -25,7 +27,11 @@ app.get('/', (req, res) => {
 
 // 4. API ROUTES
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/vendor', vendorRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/delivery', deliveryRoutes);
 
 const PORT = process.env.PORT || 8000;
 
@@ -34,4 +40,3 @@ connectDB().then(() => {
         console.log(`Server running on port ${PORT}`);
     });
 });
-
