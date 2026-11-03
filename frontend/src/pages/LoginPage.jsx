@@ -18,8 +18,8 @@ export default function LoginPage() {
     setError('');
 
     try {
-      await login(form);
-      navigate('/restaurants');
+      const user = await login(form);
+      navigate(user.role === 'VENDOR' ? '/vendor' : '/restaurants');
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to log in right now. Please try again.');
     }
