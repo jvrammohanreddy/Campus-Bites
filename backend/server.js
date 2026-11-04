@@ -1,12 +1,21 @@
-// backend/server.js
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
+const cors = require('cors');
 const connectDB = require('./src/config/db');
 const authRoutes = require('./src/routes/authRoutes');
+const userRoutes = require('./src/routes/userRoutes'); 
 const restaurantRoutes = require('./src/routes/restaurantRoutes');
-
+const vendorRoutes = require('./src/routes/vendorRoutes');
+const orderRoutes = require('./src/routes/orderRoutes');
+const deliveryRoutes = require('./src/routes/deliveryRoutes');
 
 const app = express();
+const allowedOrigins = (process.env.CORS_ORIGINS || [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+].join(',')).split(',').map((origin) => origin.trim()).filter(Boolean);
+
+app.use(cors({ origin: allowedOrigins }));
 
 // 1. TRACKER: This will immediately log the moment a request touches your server
 app.use((req, res, next) => {
@@ -25,7 +34,11 @@ app.get('/', (req, res) => {
 
 // 4. API ROUTES
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/restaurants', restaurantRoutes);
+app.use('/api/vendor', vendorRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/delivery', deliveryRoutes);
 
 const PORT = process.env.PORT || 8000;
 
@@ -34,4 +47,3 @@ connectDB().then(() => {
         console.log(`Server running on port ${PORT}`);
     });
 });
-
