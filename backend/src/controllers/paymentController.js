@@ -4,11 +4,14 @@ const Razorpay = require('razorpay');
 const Order = require('../models/Order');
 const PaymentAttempt = require('../models/PaymentAttempt');
 const Restaurant = require('../models/Restaurant');
+const getDeliveryFee = require('../utils/deliveryFee');
+const { notifyOrderStatus } = require('../utils/whatsappNotifications');
 
-const DELIVERY_FEE = 35;
+const isRazorpayConfigured = () =>
+    Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
 
 const getRazorpay = () => {
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    if (!isRazorpayConfigured()) {
         throw new Error('Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.');
     }
 
@@ -19,6 +22,12 @@ const getRazorpay = () => {
 };
 
 const createPaymentOrder = async (req, res) => {
+    if (!isRazorpayConfigured()) {
+        return res.status(503).json({
+            message: 'Online payments are not configured. Add Razorpay test keys to backend/.env and restart the backend.'
+        });
+    }
+
     try {
         const { restaurantId, items, deliveryLocation } = req.body;
 
@@ -62,7 +71,7 @@ const createPaymentOrder = async (req, res) => {
             });
         }
 
-        const amountPaise = Math.round((subtotal + DELIVERY_FEE) * 100);
+        const amountPaise = Math.round((subtotal + getDeliveryFee(subtotal)) * 100);
         if (!Number.isSafeInteger(amountPaise) || amountPaise < 100) {
             return res.status(400).json({ message: 'Order total is invalid' });
         }
@@ -103,6 +112,12 @@ const createPaymentOrder = async (req, res) => {
 };
 
 const verifyPayment = async (req, res) => {
+    if (!isRazorpayConfigured()) {
+        return res.status(503).json({
+            message: 'Online payment verification is unavailable. Configure Razorpay keys and retry verification.'
+        });
+    }
+
     const {
         razorpay_order_id: razorpayOrderId,
         razorpay_payment_id: razorpayPaymentId,
@@ -181,11 +196,13 @@ const verifyPayment = async (req, res) => {
                 items: claimedAttempt.items,
                 totalAmount: claimedAttempt.amountPaise / 100,
                 deliveryLocation: claimedAttempt.deliveryLocation,
-                paymentMethod: 'RAZORPAY',
+                paymentMethod: 'ONLINE',
                 paymentStatus: 'COMPLETED',
                 razorpayOrderId,
                 razorpayPaymentId
             });
+
+            void notifyOrderStatus({ ...order.toObject(), studentId: req.user });
 
             await PaymentAttempt.updateOne(
                 { _id: claimedAttempt._id, status: 'PROCESSING' },

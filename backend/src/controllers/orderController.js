@@ -1,15 +1,24 @@
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Restaurant = require('../models/Restaurant');
+const getDeliveryFee = require('../utils/deliveryFee');
+const { notifyOrderStatus } = require('../utils/whatsappNotifications');
 
 // @desc    Create new order
 // @route   POST /api/orders
-// @access  Private (Student)
+// @access  Private (Student, cash on delivery)
 const createOrder = async (req, res) => {
     try {
-        const { restaurantId, items, paymentMethod } = req.body;
+        const { restaurantId, items, deliveryLocation } = req.body;
 
-        if (!items || items.length === 0) {
-            return res.status(400).json({ message: 'No order items provided' });
+        if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
+            return res.status(400).json({ message: 'Provide between 1 and 50 order items' });
+        }
+        if (!mongoose.isValidObjectId(restaurantId)) {
+            return res.status(400).json({ message: 'A valid restaurant is required' });
+        }
+        if (typeof deliveryLocation !== 'string' || !deliveryLocation.trim() || deliveryLocation.length > 160) {
+            return res.status(400).json({ message: 'A valid delivery location is required' });
         }
 
         const restaurant = await Restaurant.findById(restaurantId);
@@ -22,33 +31,41 @@ const createOrder = async (req, res) => {
         const processedItems = [];
 
         for (const item of items) {
+            if (
+                !item ||
+                !mongoose.isValidObjectId(item.menuItemId) ||
+                !Number.isInteger(item.quantity) ||
+                item.quantity < 1 ||
+                item.quantity > 20
+            ) {
+                return res.status(400).json({ message: 'Invalid menu item or quantity' });
+            }
+
             const menuItem = restaurant.menu.id(item.menuItemId);
             if (!menuItem || !menuItem.isAvailable) {
-                return res.status(400).json({ message: `Item is unavailable` });
+                return res.status(400).json({ message: 'An item is unavailable' });
             }
-            
+
             totalAmount += menuItem.price * item.quantity;
-            
             processedItems.push({
                 menuItemId: menuItem._id,
                 name: menuItem.name,
                 quantity: item.quantity,
-                price: menuItem.price // Storing the price at the time of order
+                price: menuItem.price
             });
         }
-
-        // req.user has hostel and roomNumber populated from our auth middleware
-        const deliveryLocation = `${req.user.hostel}, Room ${req.user.roomNumber}`;
 
         const order = await Order.create({
             studentId: req.user._id,
             restaurantId,
             items: processedItems,
-            totalAmount,
-            deliveryLocation,
-            paymentMethod
+            totalAmount: totalAmount + getDeliveryFee(totalAmount),
+            deliveryLocation: deliveryLocation.trim(),
+            paymentMethod: 'COD',
+            paymentStatus: 'PENDING'
         });
 
+        void notifyOrderStatus({ ...order.toObject(), studentId: req.user, restaurantId: restaurant });
         res.status(201).json(order);
     } catch (error) {
         res.status(500).json({ message: 'Server Error', error: error.message });

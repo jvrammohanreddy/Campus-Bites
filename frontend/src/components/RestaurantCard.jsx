@@ -1,3 +1,5 @@
+import RatingSummary from './RatingSummary';
+
 export default function RestaurantCard({ restaurant, onViewMenu }) {
   return (
     <article
@@ -22,7 +24,11 @@ export default function RestaurantCard({ restaurant, onViewMenu }) {
             <h3>{restaurant.name}</h3>
             <p>{restaurant.cuisine}</p>
           </div>
-          <span className="rating">★ {restaurant.rating}</span>
+          <RatingSummary
+            average={restaurant.ratingAverage}
+            count={restaurant.ratingCount}
+            className="rating"
+          />
         </div>
 
         <div className="restaurant-card__meta">

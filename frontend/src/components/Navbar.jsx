@@ -6,6 +6,9 @@ export default function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
   const { itemCount } = useCart();
   const navigate = useNavigate();
+  const isVendor = user?.role === 'VENDOR';
+  const isDelivery = user?.role === 'DELIVERY';
+  const canOrder = !isAuthenticated || user?.role === 'STUDENT';
 
   const handleLogout = () => {
     logout();
@@ -22,18 +25,32 @@ export default function Navbar() {
 
         <nav className="nav" aria-label="Primary navigation">
           <NavLink to="/">Home</NavLink>
-          <NavLink to="/restaurants">Restaurants</NavLink>
-          <NavLink to="/checkout">Checkout</NavLink>
+          {isVendor ? (
+            <NavLink to="/vendor">Vendor dashboard</NavLink>
+          ) : isDelivery ? (
+            <NavLink to="/delivery">Delivery dashboard</NavLink>
+          ) : (
+            <>
+              <NavLink to="/restaurants">Restaurants</NavLink>
+              <NavLink to="/checkout">Checkout</NavLink>
+            </>
+          )}
         </nav>
 
         <div className="nav-actions">
-          <Link to="/checkout" className="cart-pill" aria-label="Cart">
-            Cart <span>{itemCount}</span>
-          </Link>
+          {canOrder ? (
+            <Link to="/checkout" className="cart-pill" aria-label="Cart">
+              Cart <span>{itemCount}</span>
+            </Link>
+          ) : null}
 
           {isAuthenticated ? (
             <div className="user-menu">
-              <span className="user-name">{user?.name}</span>
+              {user?.role === 'STUDENT' ? (
+                <Link to="/account" className="user-name">My account</Link>
+              ) : (
+                <span className="user-name">{user?.name}</span>
+              )}
               <button type="button" onClick={handleLogout} className="button button--ghost">
                 Logout
               </button>

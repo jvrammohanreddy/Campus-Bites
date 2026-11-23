@@ -21,16 +21,52 @@ export default function CheckoutPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
   const [orderId, setOrderId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('ONLINE');
+  const [orderPaymentMethod, setOrderPaymentMethod] = useState('');
 
-  const startPayment = async () => {
+  const validateCheckout = () => {
     if (!user?.token) {
-      setError('Log in with your campus account before checkout.');
-      return;
+      setError('Log in with your customer account before checkout.');
+      return false;
     }
     if (!restaurantId || !location.trim()) {
       setError('Choose a restaurant and enter a delivery location.');
-      return;
+      return false;
     }
+
+    return true;
+  };
+
+  const handleCashOnDelivery = async () => {
+    if (!validateCheckout()) return;
+
+    setError('');
+    setIsPaying(true);
+    try {
+      const { data } = await api.post('/orders', {
+        restaurantId,
+        items: items.map((item) => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+        })),
+        deliveryLocation: location.trim(),
+      });
+      setOrderId(data._id);
+      setOrderPaymentMethod('COD');
+      clearCart();
+    } catch (requestError) {
+      setError(
+        requestError.response?.data?.message ||
+          requestError.message ||
+          'Unable to place your order. Please try again.',
+      );
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  const startPayment = async () => {
+    if (!validateCheckout()) return;
 
     setError('');
     setIsPaying(true);
@@ -72,6 +108,7 @@ export default function CheckoutPage() {
           try {
             const { data } = await api.post('/payments/verify', paymentResponse);
             setOrderId(data.orderId);
+            setOrderPaymentMethod('ONLINE');
             clearCart();
           } catch (verificationError) {
             setError(
@@ -103,9 +140,14 @@ export default function CheckoutPage() {
     return (
       <div className="page page--checkout container">
         <div className="empty-order-state success-order-state">
-          <span className="eyebrow">Payment verified</span>
+          <span className="eyebrow">{orderPaymentMethod === 'COD' ? 'Cash on delivery' : 'Payment verified'}</span>
           <h1>Order placed successfully</h1>
-          <p>Your payment is confirmed. Order reference: {orderId}</p>
+          <p>
+            {orderPaymentMethod === 'COD'
+              ? 'Pay cash when your order is delivered.'
+              : 'Your online payment is confirmed.'}
+            {' '}Order reference: {orderId}
+          </p>
           <Link to="/restaurants" className="button button--primary">
             Back to restaurants
           </Link>
@@ -189,22 +231,59 @@ export default function CheckoutPage() {
           </div>
 
           {error ? <p className="form-message form-message--error" role="alert">{error}</p> : null}
+          <fieldset className="payment-methods" disabled={isPaying || isVerifying}>
+            <legend>Payment method</legend>
+            <label className={`payment-method${paymentMethod === 'ONLINE' ? ' payment-method--selected' : ''}`}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="ONLINE"
+                checked={paymentMethod === 'ONLINE'}
+                onChange={() => setPaymentMethod('ONLINE')}
+              />
+              <span className="payment-method__copy">
+                <strong>Online payment</strong>
+                <small>Pay securely with Razorpay</small>
+              </span>
+              <span className="payment-method__mark" aria-hidden="true">↗</span>
+            </label>
+            <label className={`payment-method${paymentMethod === 'COD' ? ' payment-method--selected' : ''}`}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="COD"
+                checked={paymentMethod === 'COD'}
+                onChange={() => setPaymentMethod('COD')}
+              />
+              <span className="payment-method__copy">
+                <strong>Cash on delivery</strong>
+                <small>Pay the delivery person in cash</small>
+              </span>
+              <span className="payment-method__mark" aria-hidden="true">₹</span>
+            </label>
+          </fieldset>
+
           {isVerifying ? (
-            <p role="status">Verifying payment securely…</p>
+            <p role="status">Verifying online payment securely…</p>
           ) : (
             <button
               type="button"
               className="button button--primary button--full"
-              onClick={startPayment}
+              onClick={paymentMethod === 'COD' ? handleCashOnDelivery : startPayment}
               disabled={isPaying}
             >
-              {isPaying ? 'Starting secure checkout…' : `Pay ₹${total} with Razorpay`}
+              {isPaying
+                ? (paymentMethod === 'COD' ? 'Placing order…' : 'Starting secure checkout…')
+                : (paymentMethod === 'COD' ? `Place order · Pay ₹${total} on delivery` : `Pay ₹${total} online`)}
             </button>
           )}
-          <p className="payment-disclaimer">
-            Test mode: use Razorpay test credentials. Your card details are entered only in Razorpay Checkout,
-            never stored by Campus Bites.
-          </p>
+          {paymentMethod === 'ONLINE' ? (
+            <p className="payment-disclaimer">
+              All online payments are processed securely through Razorpay. Your payment details are not stored by Campus Bites.
+            </p>
+          ) : (
+            <p className="payment-disclaimer">Have the exact cash amount ready when your order arrives.</p>
+          )}
         </aside>
       </div>
     </div>

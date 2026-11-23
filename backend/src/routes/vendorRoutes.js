@@ -10,6 +10,7 @@ const {
     updateOrderStatus
 } = require('../controllers/vendorController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
+const { uploadMenuImage } = require('../middlewares/menuImageUpload');
 
 // Require authentication and VENDOR role for all routes in this file
 router.use(protect, authorize('VENDOR'));
@@ -17,8 +18,8 @@ router.use(protect, authorize('VENDOR'));
 // --- Existing Restaurant & Menu Routes ---
 router.post('/restaurants', createRestaurant);
 router.put('/restaurants/status', toggleStatus);
-router.post('/restaurants/menu', addMenuItem);
-router.put('/restaurants/menu/:menuItemId', updateMenuItem);
+router.post('/restaurants/menu', uploadMenuImage, addMenuItem);
+router.put('/restaurants/menu/:menuItemId', uploadMenuImage, updateMenuItem);
 router.delete('/restaurants/menu/:menuItemId', deleteMenuItem);
 
 // --- New Order Management Routes ---

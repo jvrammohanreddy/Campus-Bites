@@ -46,12 +46,22 @@ export function AuthProvider({ children }) {
     persistUser(null);
   };
 
+  const updateUser = (updates) => {
+    setUser((currentUser) => {
+      if (!currentUser) return currentUser;
+      const nextUser = { ...currentUser, ...updates };
+      persistUser(nextUser);
+      return nextUser;
+    });
+  };
+
   const value = useMemo(
     () => ({
       user,
       login,
       register,
       logout,
+      updateUser,
       isAuthenticated: Boolean(user),
     }),
     [user],

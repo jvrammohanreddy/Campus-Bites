@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: 'aisha@iitb.ac.in', password: 'demo123' });
+  const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
 
   const handleChange = (event) => {
@@ -19,7 +19,13 @@ export default function LoginPage() {
 
     try {
       const user = await login(form);
-      navigate(user.role === 'VENDOR' ? '/vendor' : '/restaurants');
+      navigate(
+        user.role === 'VENDOR'
+          ? '/vendor'
+          : user.role === 'DELIVERY'
+            ? '/delivery'
+            : '/restaurants',
+      );
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to log in right now. Please try again.');
     }
@@ -35,13 +41,13 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="auth-form">
           <label>
-            IITB email
+            Email address
             <input
               type="email"
               name="email"
               value={form.email}
               onChange={handleChange}
-              placeholder="you@iitb.ac.in"
+              placeholder="you@example.com"
               required
             />
           </label>

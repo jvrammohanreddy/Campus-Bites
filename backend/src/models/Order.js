@@ -53,13 +53,21 @@ const orderSchema = new mongoose.Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ['CASH', 'UPI'],
+        enum: ['COD', 'ONLINE', 'CASH', 'UPI', 'RAZORPAY'],
         required: [true, 'Payment method is required']
     },
     paymentStatus: {
         type: String,
         enum: ['PENDING', 'COMPLETED'],
         default: 'PENDING'
+    },
+    razorpayOrderId: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
+    razorpayPaymentId: {
+        type: String
     }
 }, { timestamps: true });
 

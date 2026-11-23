@@ -9,21 +9,53 @@ const generateToken = (id) => {
 // @route   POST /api/auth/register
 const registerUser = async (req, res) => {
     try {
-        const { name, email, password, role, phone, hostel, roomNumber } = req.body;
+        const { name, email, password, phone, hostel, roomNumber } = req.body;
+        const role = req.body.role || 'STUDENT';
 
-        // Basic validation
-        if (!name || !email || !password) {
+        if (
+            typeof name !== 'string' || !name.trim() ||
+            typeof email !== 'string' || !email.trim() ||
+            typeof password !== 'string' || !password
+        ) {
             return res.status(400).json({ message: 'Please include name, email, and password' });
         }
 
-        const userExists = await User.findOne({ email });
+        if (!['STUDENT', 'VENDOR', 'DELIVERY'].includes(role)) {
+            return res.status(400).json({ message: 'Please choose a valid account type' });
+        }
+
+        if (
+            role === 'DELIVERY' &&
+            (typeof phone !== 'string' || !phone.trim() || phone.trim().length > 30)
+        ) {
+            return res.status(400).json({ message: 'Delivery accounts require a phone number of 30 characters or fewer' });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        const isValidEmail = role === 'STUDENT'
+            ? /^[\w.-]+@iitb\.ac\.in$/i.test(normalizedEmail)
+            : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+        if (!isValidEmail) {
+            return res.status(400).json({
+                message: role === 'STUDENT'
+                    ? 'Customers must use a valid @iitb.ac.in email address'
+                    : 'Please enter a valid email address'
+            });
+        }
+
+        const userExists = await User.findOne({ email: normalizedEmail });
         if (userExists) {
             return res.status(400).json({ message: 'User already exists' });
         }
 
-        // Create user with campus fields
         const user = await User.create({ 
-            name, email, password, role, phone, hostel, roomNumber 
+            name: name.trim(),
+            email: normalizedEmail,
+            password,
+            role,
+            phone: typeof phone === 'string' ? phone.trim() : phone,
+            hostel,
+            roomNumber
         });
 
         res.status(201).json({
@@ -37,6 +69,9 @@ const registerUser = async (req, res) => {
             token: generateToken(user._id)
         });
     } catch (error) {
+        if (error.name === 'ValidationError' || error.code === 11000) {
+            return res.status(400).json({ message: error.message });
+        }
         res.status(500).json({ message: 'Server Error', error: error.message });
     }
 };
@@ -46,7 +81,8 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email });
+        const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+        const user = await User.findOne({ email: normalizedEmail });
 
         if (user && (await user.matchPassword(password))) {
             res.json({

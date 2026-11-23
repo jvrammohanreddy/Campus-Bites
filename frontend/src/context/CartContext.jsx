@@ -2,6 +2,12 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 
 const CartContext = createContext(null);
 
+function getDeliveryFee(subtotal) {
+  if (subtotal < 10) return 0;
+  if (subtotal < 200) return 35;
+  return 50;
+}
+
 export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
   const [restaurantId, setRestaurantId] = useState(null);
@@ -47,7 +53,7 @@ export function CartProvider({ children }) {
   }, []);
 
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const deliveryFee = items.length ? 35 : 0;
+  const deliveryFee = items.length ? getDeliveryFee(subtotal) : 0;
   const total = subtotal + deliveryFee;
 
   const value = useMemo(

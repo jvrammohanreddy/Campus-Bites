@@ -1,17 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import api from '../services/api';
+import { getMediaUrl } from '../services/media';
 import { useAuth } from '../context/AuthContext';
 import './VendorDashboard.css';
-
-const ORDER_STATUSES = [
-  'PLACED',
-  'PREPARING',
-  'READY_FOR_PICKUP',
-  'OUT_FOR_DELIVERY',
-  'DELIVERED',
-  'CANCELLED',
-];
 
 const emptyMenuForm = {
   name: '',
@@ -36,6 +28,12 @@ function formatDate(date) {
   });
 }
 
+function formatPaymentMethod(method) {
+  if (['COD', 'CASH'].includes(method)) return 'Cash on delivery';
+  if (['ONLINE', 'RAZORPAY', 'UPI'].includes(method)) return 'Online';
+  return method;
+}
+
 export default function VendorDashboard() {
   const { user, isAuthenticated } = useAuth();
   const currentVendorId = user?._id;
@@ -48,11 +46,32 @@ export default function VendorDashboard() {
   const [restaurantForm, setRestaurantForm] = useState({ name: '', location: '' });
   const [menuForm, setMenuForm] = useState(emptyMenuForm);
   const [editingItemId, setEditingItemId] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [existingImageUrl, setExistingImageUrl] = useState('');
+  const [removeImage, setRemoveImage] = useState(false);
+
+  useEffect(() => {
+    if (!imagePreview.startsWith('blob:')) return undefined;
+    return () => URL.revokeObjectURL(imagePreview);
+  }, [imagePreview]);
 
   const loadOrders = useCallback(async () => {
     const { data } = await api.get('/vendor/orders');
     setOrders(data);
   }, []);
+
+  useEffect(() => {
+    if (user?.role !== 'VENDOR' || !restaurant?._id) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      loadOrders().catch((requestError) => {
+        setError(getErrorMessage(requestError, 'Could not refresh restaurant orders.'));
+      });
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [loadOrders, restaurant?._id, user?.role]);
 
   const loadRestaurant = useCallback(async () => {
     const { data } = await api.get('/restaurants');
@@ -149,11 +168,28 @@ export default function VendorDashboard() {
     }));
   };
 
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setImageFile(file);
+    setImagePreview(file ? URL.createObjectURL(file) : '');
+    if (file) {
+      setExistingImageUrl('');
+      setRemoveImage(false);
+    }
+  };
+
   const handleSaveMenuItem = async (event) => {
     event.preventDefault();
     clearFeedback();
     setSaving(true);
-    const payload = { ...menuForm, price: Number(menuForm.price) };
+    const payload = new FormData();
+    payload.append('name', menuForm.name);
+    payload.append('price', String(Number(menuForm.price)));
+    payload.append('description', menuForm.description);
+    payload.append('isVeg', String(menuForm.isVeg));
+    payload.append('isAvailable', String(menuForm.isAvailable));
+    payload.append('removeImage', String(removeImage));
+    if (imageFile) payload.append('image', imageFile);
 
     try {
       if (editingItemId) {
@@ -165,6 +201,9 @@ export default function VendorDashboard() {
       }
       setMenuForm(emptyMenuForm);
       setEditingItemId('');
+      setImageFile(null);
+      setExistingImageUrl('');
+      setRemoveImage(false);
       await loadRestaurant();
     } catch (requestError) {
       setError(getErrorMessage(requestError, 'Could not save this menu item.'));
@@ -183,12 +222,20 @@ export default function VendorDashboard() {
       isVeg: item.isVeg,
       isAvailable: item.isAvailable,
     });
+    setImageFile(null);
+    setImagePreview('');
+    setExistingImageUrl(item.imageUrl || '');
+    setRemoveImage(false);
     document.getElementById('vendor-menu-form')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleCancelEdit = () => {
     setEditingItemId('');
     setMenuForm(emptyMenuForm);
+    setImageFile(null);
+    setImagePreview('');
+    setExistingImageUrl('');
+    setRemoveImage(false);
   };
 
   const handleDeleteMenuItem = async (item) => {
@@ -225,15 +272,20 @@ export default function VendorDashboard() {
 
   const handleOrderStatusChange = async (orderId, status) => {
     clearFeedback();
+    setSaving(true);
 
     try {
-      const { data } = await api.put(`/vendor/orders/${orderId}/status`, { status });
-      setOrders((current) => current.map((order) => (
-        order._id === orderId ? { ...order, status: data.status } : order
-      )));
-      setNotice('Order status updated.');
+      await api.put(`/vendor/orders/${orderId}/status`, { status });
+      await loadOrders();
+      setNotice(status === 'READY_FOR_PICKUP'
+        ? 'Order is ready. It is now available to delivery people.'
+        : status === 'CANCELLED'
+          ? 'Order cancelled.'
+          : 'Order accepted and preparation started.');
     } catch (requestError) {
       setError(getErrorMessage(requestError, 'Could not update order status.'));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -360,6 +412,35 @@ export default function VendorDashboard() {
                     placeholder="Describe the dish"
                   />
                 </label>
+                <label>
+                  Menu item photo <span className="vendor-image-hint">JPG, PNG, or WebP · up to 5 MB</span>
+                  <input
+                    type="file"
+                    name="image"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleImageChange}
+                  />
+                </label>
+                {(imagePreview || existingImageUrl) ? (
+                  <div className="vendor-image-preview">
+                    <img
+                      src={imagePreview || getMediaUrl(existingImageUrl)}
+                      alt="Menu item preview"
+                    />
+                    <button
+                      type="button"
+                      className="button button--ghost button--compact"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreview('');
+                        setExistingImageUrl('');
+                        setRemoveImage(true);
+                      }}
+                    >
+                      Remove photo
+                    </button>
+                  </div>
+                ) : null}
                 <div className="vendor-checkboxes">
                   <label><input type="checkbox" name="isVeg" checked={menuForm.isVeg} onChange={handleMenuFormChange} /> Vegetarian</label>
                   <label><input type="checkbox" name="isAvailable" checked={menuForm.isAvailable} onChange={handleMenuFormChange} /> Available to order</label>
@@ -379,6 +460,14 @@ export default function VendorDashboard() {
               <div className="vendor-menu-list">
                 {(restaurant.menu || []).map((item) => (
                   <article className="vendor-menu-card" key={item._id}>
+                    {item.imageUrl ? (
+                      <img
+                        className="vendor-menu-card__image"
+                        src={getMediaUrl(item.imageUrl)}
+                        alt={item.name}
+                        loading="lazy"
+                      />
+                    ) : null}
                     <div className="vendor-menu-card__top">
                       <span className={`vendor-dietary ${item.isVeg ? 'vendor-dietary--veg' : 'vendor-dietary--nonveg'}`}>
                         {item.isVeg ? 'Veg' : 'Non-veg'}
@@ -440,7 +529,7 @@ export default function VendorDashboard() {
                   </div>
                   <div className="vendor-order-details">
                     <p><strong>Deliver to:</strong> {order.deliveryLocation}</p>
-                    <p><strong>Payment:</strong> {order.paymentMethod} · {order.paymentStatus}</p>
+                    <p><strong>Payment:</strong> {formatPaymentMethod(order.paymentMethod)} · {order.paymentStatus}</p>
                     {order.studentId?.phone ? <p><strong>Phone:</strong> {order.studentId.phone}</p> : null}
                   </div>
                   <ul className="vendor-order-items">
@@ -455,17 +544,52 @@ export default function VendorDashboard() {
                     <span className={`vendor-order-status vendor-order-status--${order.status.toLowerCase()}`}>
                       {formatStatus(order.status)}
                     </span>
-                    <label className="vendor-status-select">
-                      Update status
-                      <select
-                        value={order.status}
-                        onChange={(event) => handleOrderStatusChange(order._id, event.target.value)}
-                      >
-                        {ORDER_STATUSES.map((status) => (
-                          <option key={status} value={status}>{formatStatus(status)}</option>
-                        ))}
-                      </select>
-                    </label>
+                    {order.status === 'PLACED' ? (
+                      <div className="vendor-order-actions">
+                        <button
+                          type="button"
+                          className="button button--primary button--compact"
+                          onClick={() => handleOrderStatusChange(order._id, 'PREPARING')}
+                          disabled={saving}
+                        >
+                          Start preparing
+                        </button>
+                        <button
+                          type="button"
+                          className="button button--danger button--compact"
+                          onClick={() => handleOrderStatusChange(order._id, 'CANCELLED')}
+                          disabled={saving}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : null}
+                    {order.status === 'PREPARING' ? (
+                      <div className="vendor-order-actions">
+                        <button
+                          type="button"
+                          className="button button--primary button--compact"
+                          onClick={() => handleOrderStatusChange(order._id, 'READY_FOR_PICKUP')}
+                          disabled={saving}
+                        >
+                          Ready for pickup
+                        </button>
+                        <button
+                          type="button"
+                          className="button button--danger button--compact"
+                          onClick={() => handleOrderStatusChange(order._id, 'CANCELLED')}
+                          disabled={saving}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : null}
+                    {order.status === 'READY_FOR_PICKUP' ? (
+                      <span className="vendor-handoff-note">Waiting for delivery pickup</span>
+                    ) : null}
+                    {order.status === 'CANCELLED' ? (
+                      <span className="vendor-handoff-note">This order was cancelled</span>
+                    ) : null}
                   </div>
                 </article>
               ))}

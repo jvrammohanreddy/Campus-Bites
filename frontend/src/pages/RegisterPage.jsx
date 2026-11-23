@@ -1,92 +1,46 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-
-const initialState = {
-  name: '',
-  email: '',
-  password: '',
-  role: 'STUDENT',
-  hostel: '',
-  roomNumber: '',
-};
+import { Link } from 'react-router-dom';
 
 export default function RegisterPage() {
-  const { register } = useAuth();
-  const navigate = useNavigate();
-  const [form, setForm] = useState(initialState);
-  const [error, setError] = useState('');
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError('');
-    try {
-      const user = await register(form);
-      navigate(user.role === 'VENDOR' ? '/vendor' : '/restaurants');
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Unable to create your account. Please try again.');
-    }
-  };
-
   return (
     <div className="page page--auth">
-      <div className="auth-card">
+      <section className="auth-card registration-choice">
         <div className="auth-card__header">
-          <span className="eyebrow">New here?</span>
-          <h1>Create your account</h1>
+          <span className="eyebrow">Join Campus Bites</span>
+          <h1>Choose your account type</h1>
+          <p>Pick the sign-up form that matches how you’ll use Campus Bites.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          <label>
-            Full name
-            <input type="text" name="name" value={form.name} onChange={handleChange} required />
-          </label>
-
-          <label>
-            IITB email
-            <input type="email" name="email" value={form.email} onChange={handleChange} required />
-          </label>
-
-          <label>
-            Password
-            <input type="password" name="password" value={form.password} onChange={handleChange} required />
-          </label>
-
-          <label>
-            Account type
-            <select name="role" value={form.role} onChange={handleChange}>
-              <option value="STUDENT">Student</option>
-              <option value="VENDOR">Restaurant vendor</option>
-            </select>
-          </label>
-
-          <div className="two-column-fields">
-            <label>
-              Hostel
-              <input type="text" name="hostel" value={form.hostel} onChange={handleChange} />
-            </label>
-            <label>
-              Room no.
-              <input type="text" name="roomNumber" value={form.roomNumber} onChange={handleChange} />
-            </label>
-          </div>
-
-          {error ? <p className="form-message form-message--error" role="alert">{error}</p> : null}
-
-          <button type="submit" className="button button--primary button--full">
-            Sign up
-          </button>
-        </form>
+        <div className="registration-choice__grid">
+          <Link className="registration-choice__card" to="/register/customer">
+            <span className="registration-choice__icon" aria-hidden="true">C</span>
+            <span>
+              <strong>Customer</strong>
+              <small>Order food with your IITB account.</small>
+            </span>
+            <span className="registration-choice__arrow" aria-hidden="true">→</span>
+          </Link>
+          <Link className="registration-choice__card" to="/register/vendor">
+            <span className="registration-choice__icon registration-choice__icon--vendor" aria-hidden="true">R</span>
+            <span>
+              <strong>Restaurant owner</strong>
+              <small>Manage your restaurant with a personal email.</small>
+            </span>
+            <span className="registration-choice__arrow" aria-hidden="true">→</span>
+          </Link>
+          <Link className="registration-choice__card" to="/register/delivery">
+            <span className="registration-choice__icon registration-choice__icon--delivery" aria-hidden="true">D</span>
+            <span>
+              <strong>Delivery person</strong>
+              <small>Accept available orders and update delivery status.</small>
+            </span>
+            <span className="registration-choice__arrow" aria-hidden="true">→</span>
+          </Link>
+        </div>
 
         <p className="auth-footer">
           Already have an account? <Link to="/login">Login</Link>
         </p>
-      </div>
+      </section>
     </div>
   );
 }

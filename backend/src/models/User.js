@@ -10,7 +10,18 @@ const userSchema = new mongoose.Schema({
         type: String, 
         required: [true, 'Email is required'], 
         unique: true,
-        match: [/^[\w-\.]+@iitb\.ac\.in$/, 'Please use a valid @iitb.ac.in email address']
+        lowercase: true,
+        trim: true,
+        validate: {
+            validator(value) {
+                if (this.role === 'STUDENT') {
+                    return /^[\w.-]+@iitb\.ac\.in$/i.test(value);
+                }
+
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+            },
+            message: 'Email address is invalid for this account type'
+        }
     },
     password: { 
         type: String, 
@@ -25,6 +36,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: function() { return this.role === 'DELIVERY'; } // Enforce phone for delivery runners
     },
+    whatsappOptIn: {
+        type: Boolean,
+        default: false
+    },
     hostel: { 
         type: String 
     },
@@ -34,13 +49,12 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Pre-save hook to hash the password before saving to the database
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
     if (!this.isModified('password')) {
-        return next();
+        return;
     }
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-    next();
 });
 
 // Instance method to verify passwords during login
