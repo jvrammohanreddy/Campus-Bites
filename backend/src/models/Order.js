@@ -68,6 +68,14 @@ const orderSchema = new mongoose.Schema({
     },
     razorpayPaymentId: {
         type: String
+    },
+    razorpayOrderId: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
+    razorpayPaymentId: {
+        type: String
     }
 }, { timestamps: true });
 
